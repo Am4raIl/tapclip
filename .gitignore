@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Replays gravados em tempo de execucao
+replays/
+*.mp4
+# sondas temporarias de codec (nao deveriam sobrar, mas por seguranca)
+.probe_*.mp4

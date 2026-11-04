@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "replaycam"
+version = "1.0.0"
+description = "30-second in-RAM ring buffer for camera capture with instant replay export"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "opencv-python==4.14.0.94",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+# Only needed if you later enable the MQTT trigger (ESP32 button).
+mqtt = ["paho-mqtt>=2.0"]
+# Only needed if you prefer a global (window-focus independent) hotkey listener
+# over the stdlib console reader used by default.
+hotkey = ["pynput>=1.7"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+replaycam = "replaycam.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["replaycam*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error::DeprecationWarning:replaycam.*"]

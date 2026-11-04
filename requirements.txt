@@ -1,0 +1,10 @@
+# Runtime dependencies for replaycam.
+#
+# opencv-python is PINNED to 4.14.0.94:
+#   - It ships a cp37-abi3 wheel, so it installs cleanly on Python 3.14
+#     (the default `opencv-python` on PyPI is now 5.x, which has API breaks
+#     around VideoWriter / constants).
+#   - It is imported as `cv2` and does NOT require a system FFmpeg, because
+#     VideoWriter uses the platform encoder (Media Foundation on Windows).
+opencv-python==4.14.0.94
+numpy>=1.26
