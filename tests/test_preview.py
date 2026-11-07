@@ -8,12 +8,14 @@ codigo que de fato desenha e no codigo que de fato ajusta a janela.
 
 from __future__ import annotations
 
+import threading
 import time
 
 import cv2
 import numpy as np
 import pytest
 
+from replaycam.capture import CameraCapture
 from replaycam.cli import RetroController, draw_overlay
 from replaycam.config import config_from_args
 from replaycam.ringbuffer import RingBuffer
@@ -62,6 +64,26 @@ def test_overlay_does_not_touch_the_source_frame() -> None:
     canvas = frame.copy()
     draw_overlay(canvas, ["texto"], "dica")
     assert np.array_equal(frame, original)
+
+
+def test_camera_mirror_flips_only_when_enabled() -> None:
+    """O flip horizontal precisa ser aplicado na captura, antes de preview/buffer."""
+    frame = np.zeros((2, 3, 3), np.uint8)
+    frame[0, 0] = (10, 20, 30)
+    frame[0, 2] = (40, 50, 60)
+
+    off = CameraCapture(
+        ring=_ring(), stop_event=threading.Event(), mirror_preview=False
+    )
+    assert off._maybe_mirror(frame) is frame
+
+    on = CameraCapture(
+        ring=_ring(), stop_event=threading.Event(), mirror_preview=True
+    )
+    flipped = on._maybe_mirror(frame)
+    assert np.array_equal(flipped[0, 0], frame[0, 2])
+    assert np.array_equal(flipped[0, 2], frame[0, 0])
+    assert not np.shares_memory(flipped, frame)
 
 
 # ---------------------------------------------------------------------- slider

@@ -196,6 +196,7 @@ class CameraCapture(threading.Thread):
         buf_width: int = 640,
         buf_height: int = 480,
         backend: str = "auto",
+        mirror_preview: bool = False,
         on_error: object = None,
     ) -> None:
         super().__init__(name="capture", daemon=True)
@@ -208,6 +209,7 @@ class CameraCapture(threading.Thread):
         self.buf_width = buf_width
         self.buf_height = buf_height
         self.backend = backend
+        self.mirror_preview = mirror_preview
         self.on_error = on_error
         self.stats = CaptureStats(requested_fps=fps)
         # Slot de 1 frame para a preview, em resolucao de CAPTURA (antes do
@@ -318,6 +320,18 @@ class CameraCapture(threading.Thread):
                     f"(confirme com --list-cameras se {self.width}x{self.height} e suportado)."
                 )
 
+    def _maybe_mirror(self, frame: np.ndarray) -> np.ndarray:
+        """Inverte horizontalmente o frame quando a flag esta ativa.
+
+        Chamado ANTES de `publish_latest` e de `_maybe_resize`: assim a preview
+        e o buffer (que vira o MP4) recebem exatamente a mesma orientacao. O
+        overlay da preview e desenhado depois do flip, entao o texto continua
+        legivel.
+        """
+        if not self.mirror_preview:
+            return frame
+        return cv2.flip(frame, 1)
+
     def _maybe_resize(self, frame: np.ndarray) -> np.ndarray:
         """Reduz o frame ao tamanho do buffer, se preciso.
 
@@ -396,6 +410,10 @@ class CameraCapture(threading.Thread):
                     # Nao chama waitKey nem sleep aqui: um read que falha e
                     # instantaneo, e dormir so desperdicaria a janela do buffer.
                     continue
+
+                # O flip acontece antes de qualquer publicacao/armazenamento,
+                # para preview e MP4 compartilharem a mesma orientacao.
+                frame = self._maybe_mirror(frame)
 
                 if not got_first_frame:
                     # Agora o driver ja inicializou: as propriedades valem algo.

@@ -214,6 +214,11 @@ def test_verbose_flag() -> None:
     assert config_from_args(["--verbose"]).verbose is True
 
 
+def test_mirror_preview_defaults_off_and_parses() -> None:
+    assert config_from_args([]).mirror_preview is False
+    assert config_from_args(["--mirror-preview"]).mirror_preview is True
+
+
 def test_short_window_still_warns_on_ram() -> None:
     # Uma janela curta e o jeito mais barato de testar sem estourar RAM.
     cfg = config_from_args(["--seconds", "5"])

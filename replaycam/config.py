@@ -53,6 +53,9 @@ class Config:
     device: int = 0
     backend: str = "auto"
     quality: str = "standard"
+    # Algumas cameras/drivers entregam a imagem horizontalmente invertida. O
+    # flip e aplicado na captura, entao preview, buffer e MP4 ficam iguais.
+    mirror_preview: bool = False
     # 0 = modo nativo do driver. E o default porque o app reduz tudo para
     # `buf_*` de qualquer jeito: pedir 1080p para descartar 3 de cada 4 pixels
     # so gasta banda de USB e CPU. Passe --width/--height para fixar um modo.
@@ -228,6 +231,9 @@ def build_parser() -> argparse.ArgumentParser:
     dev = p.add_argument_group("dispositivo")
     dev.add_argument("--device", "-d", type=int, default=0, help="indice da camera (0 = primeira)")
     dev.add_argument("--backend", choices=BACKEND_CHOICES, default="auto", help="API de captura do OpenCV")
+    dev.add_argument("--mirror-preview", action="store_true",
+                     help="espelha horizontalmente a imagem da camera na preview e nos MP4 "
+                          "salvos (corrige cameras que entregam a imagem invertida)")
     # `SUPPRESS` nas opcoes que o preset de qualidade pode definir: assim o
     # `config_from_args` sabe distinguir "nao informado" de um valor explicito,
     # e `--quality high --buf-width 640` respeita o 640 do usuario.
@@ -301,6 +307,7 @@ def config_from_args(argv: list[str] | None = None) -> Config:
         device=ns.device,
         backend=ns.backend,
         quality=ns.quality,
+        mirror_preview=ns.mirror_preview,
         width=pick("width", preset.width),
         height=pick("height", preset.height),
         fps=ns.fps,

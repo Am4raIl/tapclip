@@ -24,6 +24,7 @@ A captura não grava vídeo continuamente em disco: os arquivos são produzidos 
 - **Tempo ajustável:** slider para alterar a janela retroativa durante a execução, dentro do orçamento configurado.
 - **Captura independente da exportação:** uma thread captura os frames e outra grava os replays.
 - **Presets de qualidade:** `--quality high` grava em 1280 × 720 mantendo os 30 segundos (mais RAM e arquivos maiores).
+- **Correção de espelhamento:** `--mirror-preview` inverte horizontalmente a imagem na preview e nos MP4 salvos.
 - **Controle de disparos:** debounce e fila com um pedido pendente, substituído quando chega um novo pedido.
 - **Exportação validada:** seleção de codec com fallback e reabertura do arquivo para conferir decodificação, contagem de frames e FPS.
 - **Arquivos sem sobrescrita:** nomes com data e hora e sufixos quando há colisão.
@@ -161,6 +162,9 @@ python -m replaycam --seconds 10 --no-preview
 # Melhor qualidade: grava em 1280x720 mantendo 30 segundos (~2,3 GiB de RAM)
 python -m replaycam --quality high
 
+# Corrigir câmera que entrega a imagem espelhada (preview e MP4)
+python -m replaycam --quality high --mirror-preview
+
 # Pedir captura em 1080p e manter o buffer em 640x480
 python -m replaycam --width 1920 --height 1080 --buf-width 640 --buf-height 480
 
@@ -182,6 +186,7 @@ python -m replaycam --outdir meus-replays --prefix clip --fourcc mp4v
 | --- | --- | --- |
 | `--device`, `-d` | `0` | Índice da câmera |
 | `--backend` | `auto` | Backend: `auto`, `any`, `dshow` ou `msmf`; os dois últimos são específicos do Windows |
+| `--mirror-preview` | Desativado | Inverte horizontalmente a imagem da câmera na preview e nos MP4 salvos |
 | `--width` / `--height` | `0` / `0` | Resolução solicitada ao driver; zero mantém o modo nativo. O preset `high` usa `1280` / `720` |
 | `--fps` | `30` | FPS solicitado para captura |
 | `--buf-width` / `--buf-height` | `640` / `480` | Dimensões dos frames armazenados em RAM e exportados. O preset `high` usa `1280` / `720` |
@@ -295,6 +300,7 @@ O código de saída é `0` quando o autoteste passa e `1` quando detecta falhas.
 | Replay mais curto que o esperado | Espere o buffer preencher, confira o teto de RAM e compare o FPS medido com `--export-fps`. |
 | Vídeo acelerado ou lento | Ajuste `--export-fps` à taxa efetivamente capturada. |
 | Gravação com qualidade baixa | Use `--quality high` para gravar em 1280 × 720 e confirme com `--list-cameras --width 1280 --height 720` se a câmera entrega esse modo. |
+| Imagem espelhada/invertida | Adicione `--mirror-preview`; a correção vale para a preview e para os MP4 salvos. |
 | Uso elevado de RAM ou perda de frames | Reduza `--buf-width`, `--buf-height` ou `--seconds`; experimente `--no-preview`. Com `--quality high`, reduza `--seconds` primeiro. |
 | A preview não abriu | Confira se há sessão gráfica disponível; o programa tenta continuar pelo console quando a criação da janela falha. |
 | Mensagens de OpenH264 | No Windows, use `.\replaycam.cmd` para reduzir o ruído. Confira `SALVO` e o codec real; mensagens nativas podem acompanhar um fallback bem-sucedido. |

@@ -183,6 +183,8 @@ def _print_header(cfg: Config) -> None:
     print(f" qualidade : preset {cfg.quality}   "
           f"(buffer {cfg.buf_width}x{cfg.buf_height}, "
           f"orcamento {cfg.max_buffer_mib:g} MiB)")
+    if cfg.mirror_preview:
+        print(" espelho   : horizontal (preview e MP4)")
     # Mostra o tempo REALMENTE usado. Se o pedido foi cortado pelo teto de RAM,
     # a diferenca e dita na cara: silenciar isso seria mentir sobre a memoria
     # que o processo vai reservar.
@@ -439,6 +441,7 @@ def run(cfg: Config) -> int:
         ring=ring, stop_event=stop_event, device=cfg.device, width=cfg.width,
         height=cfg.height, fps=cfg.fps, buf_width=cfg.buf_width,
         buf_height=cfg.buf_height, backend=cfg.backend,
+        mirror_preview=cfg.mirror_preview,
         on_error=lambda exc: print(f" ERRO de captura: {exc}"),
     )
     capture.start()
