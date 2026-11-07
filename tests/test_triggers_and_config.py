@@ -92,11 +92,45 @@ def test_keyboard_trigger_thread_starts_and_stops() -> None:
 
 def test_defaults_match_documented_30s_plan() -> None:
     cfg = config_from_args([])
+    assert cfg.quality == "standard"
     assert cfg.seconds == 30.0
     assert cfg.fps == 30.0
     assert cfg.buf_width == 640 and cfg.buf_height == 480
     assert cfg.triggers == ("keyboard",)
     assert cfg.effective_export_fps == 30.0
+
+
+def test_quality_high_uses_720p_and_keeps_30s() -> None:
+    cfg = config_from_args(["--quality", "high"])
+    assert cfg.quality == "high"
+    assert (cfg.width, cfg.height) == (1280, 720)
+    assert (cfg.buf_width, cfg.buf_height) == (1280, 720)
+    assert cfg.max_buffer_mib == 2560
+    assert cfg.effective_seconds == 30.0
+    assert cfg.estimated_buffer_mib() > 2300
+    assert cfg.max_retro_seconds >= 30
+
+
+def test_quality_high_does_not_emit_the_generic_ram_alarm() -> None:
+    """O preset high gasta mais RAM de proposito; o aviso generico seria ruido."""
+    assert config_from_args(["--quality", "high"]).validate() == []
+
+
+def test_quality_high_respects_explicit_overrides() -> None:
+    cfg = config_from_args([
+        "--quality", "high",
+        "--buf-width", "640", "--buf-height", "480",
+        "--max-buffer-mib", "1024",
+    ])
+    assert (cfg.buf_width, cfg.buf_height) == (640, 480)
+    assert cfg.max_buffer_mib == 1024
+    # A captura continua no modo high, a menos que o usuario tambem a mude.
+    assert (cfg.width, cfg.height) == (1280, 720)
+
+
+def test_quality_high_warns_when_the_window_exceeds_its_budget() -> None:
+    cfg = config_from_args(["--quality", "high", "--seconds", "120"])
+    assert any("teto" in w for w in cfg.validate())
 
 
 def test_estimated_buffer_is_829mb_for_640x480_30s_30fps() -> None:

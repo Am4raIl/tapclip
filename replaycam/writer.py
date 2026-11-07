@@ -131,6 +131,13 @@ class ExportResult:
     elapsed_seconds: float
     error: str | None = None
 
+    @property
+    def bitrate_mbps(self) -> float:
+        """Bitrate medio do arquivo, para conferir o ganho de qualidade."""
+        if self.duration_seconds <= 0:
+            return 0.0
+        return self.size_bytes * 8 / self.duration_seconds / 1_000_000
+
 
 def build_filename(when: datetime | None = None, prefix: str = "replay") -> str:
     """`replay_YYYYMMDD_HHMMSS.mp4`, com sufixo se ja existir arquivo igual."""

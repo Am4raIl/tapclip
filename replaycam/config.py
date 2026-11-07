@@ -4,11 +4,46 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field
+from typing import TypeVar
 
 # Ordem de preference de backend. 'auto' = CAP_ANY, que o OpenCV resolve por
 # Device (indice) ou por nome.
 BACKEND_CHOICES = ("auto", "any", "dshow", "msmf")
 TRIGGER_CHOICES = ("keyboard",)
+QUALITY_CHOICES = ("standard", "high")
+
+
+@dataclass(frozen=True, slots=True)
+class QualityPreset:
+    """Resolucao de captura/buffer e orcamento de RAM de um preset de qualidade.
+
+    O preset nao mexe no codec: no Windows o H.264 do Media Foundation usa um
+    bitrate proporcional a `fps * largura * altura`. Subir a resolucao aumenta a
+    qualidade e o tamanho do arquivo ao mesmo tempo, sem depender de FFmpeg.
+    """
+
+    width: int
+    height: int
+    buf_width: int
+    buf_height: int
+    max_buffer_mib: float
+
+
+# `standard` preserva o comportamento historico do app (buffer 640x480 e 1 GiB
+# de orcamento). `high` usa o modo maximo comum das webcams (720p) e um
+# orcamento que comporta 30 s nessa resolucao (~2,3 GiB reais).
+QUALITY_PRESETS: dict[str, QualityPreset] = {
+    "standard": QualityPreset(
+        width=0, height=0,
+        buf_width=640, buf_height=480,
+        max_buffer_mib=1024.0,
+    ),
+    "high": QualityPreset(
+        width=1280, height=720,
+        buf_width=1280, buf_height=720,
+        max_buffer_mib=2560.0,
+    ),
+}
 
 
 @dataclass
@@ -17,6 +52,7 @@ class Config:
 
     device: int = 0
     backend: str = "auto"
+    quality: str = "standard"
     # 0 = modo nativo do driver. E o default porque o app reduz tudo para
     # `buf_*` de qualquer jeito: pedir 1080p para descartar 3 de cada 4 pixels
     # so gasta banda de USB e CPU. Passe --width/--height para fixar um modo.
@@ -135,7 +171,12 @@ class Config:
         """Retorna uma lista de AVISOS (nao erros): coisas que funcionam, mas vao te morder."""
         warnings: list[str] = []
         mib = self.estimated_buffer_mib()
-        if mib > 1536:
+        # O preset `high` foi escolhido justamente para gastar mais RAM e manter
+        # 30 s em 720p. Nao adianta avisar sobre o que o usuario acabou de pedir;
+        # o aviso generico volta a aparecer se ele estourar o orcamento do preset
+        # (por exemplo, aumentando --seconds ou a resolucao do buffer).
+        high_budget = QUALITY_PRESETS["high"].max_buffer_mib
+        if mib > 1536 and not (self.quality == "high" and mib <= high_budget):
             warnings.append(
                 f"buffer estimado em {mib:.0f} MiB de RAM. Acima de ~1.5 GiB o sistema "
                 "comeca a paginar e a captura perde frames. Reduza --buf-width/--buf-height "
@@ -187,18 +228,28 @@ def build_parser() -> argparse.ArgumentParser:
     dev = p.add_argument_group("dispositivo")
     dev.add_argument("--device", "-d", type=int, default=0, help="indice da camera (0 = primeira)")
     dev.add_argument("--backend", choices=BACKEND_CHOICES, default="auto", help="API de captura do OpenCV")
-    dev.add_argument("--width", type=int, default=0,
-                     help="largura de captura pedida ao driver (0 = modo nativo, recomendado)")
-    dev.add_argument("--height", type=int, default=0,
-                     help="altura de captura pedida ao driver (0 = modo nativo, recomendado)")
+    # `SUPPRESS` nas opcoes que o preset de qualidade pode definir: assim o
+    # `config_from_args` sabe distinguir "nao informado" de um valor explicito,
+    # e `--quality high --buf-width 640` respeita o 640 do usuario.
+    dev.add_argument("--width", type=int, default=argparse.SUPPRESS,
+                     help="largura de captura pedida ao driver (0 = modo nativo; "
+                          "preset standard: nativo, preset high: 1280)")
+    dev.add_argument("--height", type=int, default=argparse.SUPPRESS,
+                     help="altura de captura pedida ao driver (0 = modo nativo; "
+                          "preset standard: nativo, preset high: 720)")
     dev.add_argument("--fps", type=float, default=30.0, help="FPS de captura pedido ao driver")
 
     buf = p.add_argument_group("buffer em RAM")
-    buf.add_argument("--buf-width", type=int, default=640, help="largura dos frames no buffer (RAM)")
-    buf.add_argument("--buf-height", type=int, default=480, help="altura dos frames no buffer (RAM)")
+    buf.add_argument("--buf-width", type=int, default=argparse.SUPPRESS,
+                     help="largura dos frames no buffer (RAM; standard: 640, high: 1280)")
+    buf.add_argument("--buf-height", type=int, default=argparse.SUPPRESS,
+                     help="altura dos frames no buffer (RAM; standard: 480, high: 720)")
     buf.add_argument("--seconds", type=float, default=30.0, help="janela de tempo mantida em RAM")
 
     out = p.add_argument_group("saida")
+    out.add_argument("--quality", choices=QUALITY_CHOICES, default="standard",
+                     help="preset de qualidade: standard=640x480/1 GiB, "
+                          "high=1280x720/2,5 GiB")
     out.add_argument("--outdir", default="replays", help="diretorio de destino dos .mp4")
     out.add_argument("--export-fps", type=float, default=None, help="FPS do arquivo gravado (default: igual ao --fps)")
     out.add_argument("--fourcc", default=None, help="forca um FourCC (ex: mp4v). Default: fallback automatico")
@@ -218,9 +269,10 @@ def build_parser() -> argparse.ArgumentParser:
                       help="dispara o gatilho sozinho apos N segundos (0 = off). "
                            "Para testar o caminho de gravacao sem depender do teclado.")
     misc.add_argument("--stats-interval", type=float, default=5.0, help="intervalo do log de status (s, 0 = off)")
-    misc.add_argument("--max-buffer-mib", type=float, default=1024.0,
-                      help="teto de RAM do slider de tempo retroativo. Acima de ~1536 MiB "
-                           "o sistema pagina e a captura perde frames")
+    misc.add_argument("--max-buffer-mib", type=float, default=argparse.SUPPRESS,
+                      help="teto de RAM do slider de tempo retroativo "
+                           "(standard: 1024, high: 2560). Acima de ~1536 MiB o "
+                           "sistema pode paginar e a captura perde frames")
     misc.add_argument("--verbose", action="store_true",
                       help="nao silencia o log nativo do FFmpeg (diagnostico de codec)")
 
@@ -237,14 +289,23 @@ def config_from_args(argv: list[str] | None = None) -> Config:
     if isinstance(key, str) and "\\r" in key:
         key = key.replace("\\r", "\r")
 
+    preset = QUALITY_PRESETS[ns.quality]
+
+    T = TypeVar("T")
+
+    def pick(name: str, fallback: T) -> T:
+        """Valor explicito da CLI ou o valor do preset quando a opcao falta."""
+        return getattr(ns, name, fallback)
+
     return Config(
         device=ns.device,
         backend=ns.backend,
-        width=ns.width,
-        height=ns.height,
+        quality=ns.quality,
+        width=pick("width", preset.width),
+        height=pick("height", preset.height),
         fps=ns.fps,
-        buf_width=ns.buf_width,
-        buf_height=ns.buf_height,
+        buf_width=pick("buf_width", preset.buf_width),
+        buf_height=pick("buf_height", preset.buf_height),
         seconds=ns.seconds,
         outdir=ns.outdir,
         export_fps=ns.export_fps,
@@ -259,5 +320,5 @@ def config_from_args(argv: list[str] | None = None) -> Config:
         auto_trigger=ns.auto_trigger,
         stats_interval=ns.stats_interval,
         verbose=ns.verbose,
-        max_buffer_mib=ns.max_buffer_mib,
+        max_buffer_mib=pick("max_buffer_mib", preset.max_buffer_mib),
     )

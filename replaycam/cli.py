@@ -180,6 +180,9 @@ def _print_header(cfg: Config) -> None:
     print("=" * 68)
     print(f" captura   : device={cfg.device} backend={cfg.backend} "
           f"{cap_mode}@{cfg.fps:g}   (buffer {cfg.buf_width}x{cfg.buf_height})")
+    print(f" qualidade : preset {cfg.quality}   "
+          f"(buffer {cfg.buf_width}x{cfg.buf_height}, "
+          f"orcamento {cfg.max_buffer_mib:g} MiB)")
     # Mostra o tempo REALMENTE usado. Se o pedido foi cortado pelo teto de RAM,
     # a diferenca e dita na cara: silenciar isso seria mentir sobre a memoria
     # que o processo vai reservar.
@@ -289,6 +292,7 @@ def run_self_test(cfg: Config) -> int:
         print(
             f"[self-test] writer: {result.path.name}"
             f" ({_fmt_bytes(result.size_bytes)}"
+            f", ~{result.bitrate_mbps:.1f} Mbps"
             f", fourcc pedido={result.requested_fourcc} real={codec}"
             f", {result.frames} frames"
             f", {result.elapsed_seconds * 1000:.0f} ms)"
@@ -420,6 +424,7 @@ def run(cfg: Config) -> int:
             if res.ok:
                 print(f" SALVO via {source}: {res.path}  "
                       f"({_fmt_bytes(res.size_bytes)}, {res.duration_seconds:.1f}s, "
+                      f"~{res.bitrate_mbps:.1f} Mbps, "
                       f"fourcc={res.actual_fourcc or '?'}, {res.elapsed_seconds * 1000:.0f} ms)  "
                       f"buffer tinha {len(frames)} frames")
             else:

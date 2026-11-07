@@ -74,6 +74,7 @@ def test_export_creates_playable_file_with_right_duration(tmp_path) -> None:
     assert result.requested_fourcc in DEFAULT_FOURCC_CHAIN
     assert result.actual_fourcc, "o codec real do arquivo deve ser reportado"
     assert result.duration_seconds == pytest.approx(1.5, abs=0.01)
+    assert result.bitrate_mbps > 0
 
     # Confirma lendo o arquivo de volta, e nao so o que devolvemos.
     read_back = exporter.probe_duration(result.path)
